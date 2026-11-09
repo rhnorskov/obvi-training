@@ -1,8 +1,8 @@
--- Retribution Paladin, leveling: the spells worth training and the ones to save the gold on. Spells not listed
+-- Retribution Paladin: the spells worth training while leveling and the ones to save the gold on. Spells not listed
 -- (Seal of Justice, Concentration Aura, Turn Undead, Holy Wrath...) aren't trained.
 
 ObviTraining.Plan({
-	title = "Retribution Paladin (leveling)",
+	title = "Retribution Paladin",
 	class = "PALADIN",
 	spells = {
 		-- every rank

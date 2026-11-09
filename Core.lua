@@ -174,7 +174,7 @@ function ns.RankOf(text) return tonumber(text and text:match("(%d+)")) or 1 end
 
 -- the text form: a header, then a line per spell. "#" starts a comment.
 --   Obvi Training plan
---   title: Retribution Paladin (leveling)
+--   title: Retribution Paladin
 --   class: PALADIN
 --   Holy Light: all
 --   Devotion Aura: first
