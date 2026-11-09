@@ -1,0 +1,13 @@
+# What the BigWigs packager puts in Obvi Training's zip.
+package-as: ObviTraining
+
+# the changelog is written by hand, not made from commit messages
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+# development files stay out of the zip
+ignore:
+  - .luarc.json
+  - .github
+  - tools

@@ -1,0 +1,5 @@
+.types/
+.release/
+*.zip
+Thumbs.db
+.DS_Store

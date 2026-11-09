@@ -1,0 +1,32 @@
+# Builds Obvi Training and publishes it when a version tag is pushed (git tag v0.1.0 && git push origin v0.1.0):
+# to CurseForge once the TOC has an X-Curse-Project-ID, and to the GitHub release.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # the GitHub release
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Find the CurseForge project
+        id: project
+        run: |
+          id=$(grep -oP '^## X-Curse-Project-ID:\s*\K\d+' ObviTraining.toc || true)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          [ -n "$id" ] || echo "no CurseForge project yet: GitHub release only"
+
+      - uses: BigWigsMods/packager@v2
+        with:
+          args: ${{ steps.project.outputs.id != '' && format('-p {0}', steps.project.outputs.id) || '' }}
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}   # CurseForge API token (repository secret)
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}

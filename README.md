@@ -5,7 +5,7 @@ cast. Obvi Training puts a **Train plan** button on the class trainer, next to T
 plan for your class says is worth it, and as new ranks open up (rank 2 after rank 1) it keeps going. Hover over it to
 see what it will train and what it costs; right-click it to pick another plan, or open the plan window.
 
-It works on its own: it doesn't need Obvi Guide, the guide viewer from the same repo.
+It works on its own; it goes well with [Obvi Guide](https://github.com/rhnorskov/obvi-guide), the guide viewer.
 
 ## The plan window
 
@@ -56,6 +56,21 @@ ObviTraining.Plan({
 	},
 })
 ```
+
+## Trying the newest version
+
+To play with the latest changes before they're released, paste this into PowerShell. It downloads this repo from
+GitHub and puts Obvi Training in your game's AddOns folder (no git needed); run it again to update:
+
+```
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/rhnorskov/obvi-training/main/tools/install.ps1)))
+```
+
+## Development
+
+Link the repo into the game's `InterfaceAddOns` as `ObviTraining` (a junction), e.g.
+`mklink /J "<game>_forever_InterfaceAddOnsObviTraining" "%CD%"`. Type check: `powershell -File toolseck.ps1`.
+Releases: push a `v*` tag.
 
 ## Licence
 
