@@ -13,7 +13,6 @@ local frame ---@type Frame?
 local content ---@type Frame
 local planButton ---@type Button
 local summary ---@type FontString
-local hint ---@type FontString
 local resetButton ---@type Button
 ---@class ObviTrainingChip: Frame
 ---@field bg Texture
@@ -234,19 +233,20 @@ local function Fill()
 	resetButton:SetText(plan and ns.IsBuiltin(plan) and "Reset" or "Delete")
 	local list = Spells(plan)
 	local seen = ns.db.trainer and ns.db.trainer[ns.Class()]
-	hint:SetShown(not seen)
+
 	local planCost, laterCost, allCost = 0, 0, 0
 	for i, e in ipairs(list) do
 		local r = Row(i)
 		r:Show()
-		r.icon:SetTexture(e.spell and e.spell.icon or 134400)
+		-- the trainer's icon, else the spell's own by name (known spells, and many others), else a question mark
+		r.icon:SetTexture(e.spell and e.spell.icon or C_Spell.GetSpellTexture(e.name) or 134400)
 		r.name:SetText(e.name)
 		local rule = plan and plan.spells[e.name]
 		r.rule:SetText(ns.Describe(rule))
 		r.rule:SetEnabled(plan ~= nil)
 		r.rule:SetScript("OnClick", function(self) if plan then RuleMenu(self, plan, e.name) end end)
 		for _, c in ipairs(r.chips) do c:Hide() end
-		r.note:SetText(e.spell and "" or "not seen at your trainer yet")
+		r.note:SetText((e.spell or not seen) and "" or "not seen at your trainer yet")
 		local ranks = {}
 		for rank in pairs(e.spell and e.spell.ranks or {}) do table.insert(ranks, rank) end
 		table.sort(ranks)
@@ -273,7 +273,7 @@ local function Fill()
 		summary:SetText(("The plan costs %s%s; every rank: %s."):format(ns.Coins(planCost),
 			laterCost > 0 and (" (+ " .. ns.Coins(laterCost) .. " later)") or "", ns.Coins(allCost)))
 	else
-		summary:SetText("")
+		summary:SetText(not seen and "|cffaaaaaaTalk to your class trainer once to see every rank here, with its level and cost.|r" or "")
 	end
 end
 
@@ -390,10 +390,6 @@ local function Build()
 	content:SetSize(WIDTH - 50, 1)
 	scroll:SetScrollChild(content)
 
-	hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	hint:SetPoint("CENTER", scroll, "CENTER")
-	hint:SetWidth(WIDTH - 120)
-	hint:SetText("Talk to your class trainer once: Obvi Training remembers every spell and rank it teaches, to show the whole plan here.")
 
 	f:SetScript("OnShow", Fill)
 end
