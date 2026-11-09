@@ -68,8 +68,8 @@ GitHub and puts Obvi Training in your game's AddOns folder (no git needed); run 
 
 ## Development
 
-Link the repo into the game's `InterfaceAddOns` as `ObviTraining` (a junction), e.g.
-`mklink /J "<game>_forever_InterfaceAddOnsObviTraining" "%CD%"`. Type check: `powershell -File toolseck.ps1`.
+Link the repo into the game's `Interface\AddOns` as `ObviTraining` (a junction), e.g.
+`mklink /J "<game>\_forever_\Interface\AddOns\ObviTraining" "%CD%"`. Type check: `powershell -File tools\check.ps1`.
 Releases: push a `v*` tag.
 
 ## Licence
