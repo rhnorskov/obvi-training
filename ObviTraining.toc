@@ -1,10 +1,13 @@
 ## Interface: 16001, 120105
 ## Title: Obvi Training
 ## Version: @project-version@
-## Notes: A "Train plan" button on the class trainer that trains only the spells worth the gold, from a training plan for your class and spec.
+## Notes: A "Train plan" button on the class trainer that trains only the spells worth the gold, from a training plan for your class and spec. /otr shows and edits the plan.
 ## Author: Rasmus Norskov
 ## X-License: GPL-3.0-or-later
+## SavedVariables: ObviTrainingDB
 ## SavedVariablesPerCharacter: ObviTrainingCharDB
 
-Training.lua
+Core.lua
+Trainer.lua
+UI.lua
 Plans\PaladinRetribution.lua
