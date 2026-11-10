@@ -7,7 +7,6 @@ local _, ns = ...
 local button ---@type Button?
 local buyingUntil = 0   -- buying goes on as new ranks open up (rank 2 is listed once rank 1 is learnt), until then
 local approved = {} ---@type table<string, boolean>   what the player said yes to: "name|rank"
-local recording = false
 
 ---@class ObviTrainingBuy
 ---@field name string
@@ -163,13 +162,10 @@ events:SetScript("OnEvent", function(_, event, name)
 	if event == "ADDON_LOADED" then
 		-- the trainer window is an addon of its own, loaded the first time a trainer is opened
 		if name == "Blizzard_TrainerUI" or (name == "ObviTraining" and C_AddOns.IsAddOnLoaded("Blizzard_TrainerUI")) then Setup() end
-	elseif event == "TRAINER_SHOW" then
-		recording = true
+	elseif event == "TRAINER_SHOW" or event == "TRAINER_UPDATE" then
+		-- the list as it is now (it changes with the filters, and as spells are learnt)
 		ns.Record()
-		recording = false
+		if event == "TRAINER_UPDATE" and GetTime() < buyingUntil then Buy() end
 		ns.Refresh()
-	elseif event == "TRAINER_UPDATE" and not recording then
-		if GetTime() < buyingUntil then Buy() end
-		Refresh()
 	end
 end)

@@ -161,10 +161,9 @@ function ns.Describe(rule)
 	if rule == "all" then return "All ranks" end
 	if rule == "first" then return "First rank" end
 	if type(rule) == "table" then
-		local parts = {}
-		if rule.upto then table.insert(parts, "Up to level " .. rule.upto) end
-		if rule.from then table.insert(parts, "all with " .. rule.from) end
-		return table.concat(parts, ", ")
+		if rule.upto and rule.from then return ("Up to %d, then with %s"):format(rule.upto, rule.from) end
+		if rule.upto then return "Up to level " .. rule.upto end
+		if rule.from then return "All with " .. rule.from end
 	end
 	return "Skip"
 end
@@ -273,17 +272,12 @@ function ns.Import(text)
 end
 
 --- Remembers what the class trainer lists (every rank, with its level and cost), to show the whole plan away from
---- the trainer. The trainer's filters are opened up for the reading and put back after.
+--- the trainer: whatever it lists, added to what was seen before. Its filters decide what it lists: tick "Already
+--- Known" once for the ranks you have, "Unavailable" for the ones to come.
 function ns.Record()
 	if IsTradeskillTrainer() then return end
 	ns.db.trainer = ns.db.trainer or {}
 	local spells = ns.db.trainer[ns.Class()] or {}
-	ns.db.trainer[ns.Class()] = spells
-	local filters = {}
-	for _, f in ipairs({ "available", "unavailable", "used" }) do
-		filters[f] = GetTrainerServiceTypeFilter(f)
-		if not filters[f] then SetTrainerServiceTypeFilter(f, true, false) end
-	end
 	for i = 1, GetNumTrainerServices() do
 		local name, rank, category = ns.Service(i)
 		if name and category ~= "header" then
@@ -293,7 +287,7 @@ function ns.Record()
 			spell.ranks[rank] = { level = GetTrainerServiceLevelReq(i) or 0, cost = GetTrainerServiceCost(i) or 0 }
 		end
 	end
-	for f, on in pairs(filters) do if not on then SetTrainerServiceTypeFilter(f, false, false) end end
+	if next(spells) then ns.db.trainer[ns.Class()] = spells end
 end
 
 function ns.Coins(copper) return C_CurrencyInfo.GetCoinTextureString(copper) end
@@ -305,7 +299,7 @@ events:SetScript("OnEvent", function(_, _, name)
 	ObviTrainingDB = ObviTrainingDB or {}
 	ObviTrainingCharDB = ObviTrainingCharDB or {}
 	ns.db, ns.charDB = ObviTrainingDB, ObviTrainingCharDB
-	-- the spell lists remembered before ranks were read right on Forever (every rank as rank 1): forgotten once
-	if (ns.db.version or 0) < 2 then ns.db.trainer, ns.db.version = nil, 2 end
+	-- the spell lists remembered wrong before (every rank as rank 1 on Forever, or left empty): forgotten once
+	if (ns.db.version or 0) < 3 then ns.db.trainer, ns.db.version = nil, 3 end
 	events:UnregisterEvent("ADDON_LOADED")
 end)

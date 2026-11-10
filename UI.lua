@@ -5,7 +5,8 @@
 local _, ns = ...
 ---@cast ns ObviTrainingNS
 
-local WIDTH, HEIGHT, ROW = 660, 520, 22
+local WIDTH, HEIGHT, ROW = 730, 520, 22
+local RANKS_X = 400   -- where the rank boxes start in a row
 local CHIP = 24
 local COLOURS = { train = { 0.2, 0.7, 0.25 }, skip = { 0.3, 0.3, 0.3 }, later = { 0.8, 0.65, 0.15 } }
 
@@ -195,12 +196,12 @@ local function Row(i)
 	r.name:SetJustifyH("LEFT")
 	r.name:SetWordWrap(false)
 	r.rule = CreateFrame("Button", nil, r, "UIPanelButtonTemplate") --[[@as Button]]
-	r.rule:SetSize(140, 20)
+	r.rule:SetSize(210, 20)
 	r.rule:SetPoint("LEFT", 182, 0)
 	r.rule:SetNormalFontObject("GameFontHighlightSmall")
 	r.chips = {}
 	r.note = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	r.note:SetPoint("LEFT", 330, 0)
+	r.note:SetPoint("LEFT", RANKS_X, 0)
 	rows[i] = r
 	return r
 end
@@ -209,7 +210,7 @@ local function Chip(r, k)
 	if r.chips[k] then return r.chips[k] end
 	local c = CreateFrame("Frame", nil, r) --[[@as ObviTrainingChip]]
 	c:SetSize(CHIP - 2, ROW - 6)
-	c:SetPoint("LEFT", 330 + (k - 1) * CHIP, 0)
+	c:SetPoint("LEFT", RANKS_X + (k - 1) * CHIP, 0)
 	c.bg = c:CreateTexture(nil, "BACKGROUND")
 	c.bg:SetAllPoints()
 	c.text = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -232,7 +233,8 @@ local function Fill()
 	resetButton:SetShown(plan ~= nil and (ns.IsEdited(plan) or not ns.IsBuiltin(plan)))
 	resetButton:SetText(plan and ns.IsBuiltin(plan) and "Reset" or "Delete")
 	local list = Spells(plan)
-	local seen = ns.db.trainer and ns.db.trainer[ns.Class()]
+	local remembered = ns.db.trainer and ns.db.trainer[ns.Class()]
+	local seen = remembered and next(remembered) and remembered or nil
 
 	local planCost, laterCost, allCost = 0, 0, 0
 	for i, e in ipairs(list) do
@@ -246,7 +248,10 @@ local function Fill()
 		r.rule:SetEnabled(plan ~= nil)
 		r.rule:SetScript("OnClick", function(self) if plan then RuleMenu(self, plan, e.name) end end)
 		for _, c in ipairs(r.chips) do c:Hide() end
-		r.note:SetText((e.spell or not seen) and "" or "not seen at your trainer yet")
+		-- (what the trainer lists depends on its filters: a spell you have every rank of so far shows only with
+		-- "Already Known" ticked)
+		r.note:SetText((e.spell or not seen) and "" or ns.Knows(e.name) and "learnt; tick Already Known at the trainer"
+			or "not seen at your trainer yet")
 		local ranks = {}
 		for rank in pairs(e.spell and e.spell.ranks or {}) do table.insert(ranks, rank) end
 		table.sort(ranks)
@@ -270,10 +275,10 @@ local function Fill()
 	for i = #list + 1, #rows do rows[i]:Hide() end
 	content:SetHeight(math.max(1, #list * ROW))
 	if seen and plan then
-		summary:SetText(("The plan costs %s%s; every rank: %s."):format(ns.Coins(planCost),
+		summary:SetText(("Of the ranks seen at your trainer, the plan costs %s%s; all of them: %s."):format(ns.Coins(planCost),
 			laterCost > 0 and (" (+ " .. ns.Coins(laterCost) .. " later)") or "", ns.Coins(allCost)))
 	else
-		summary:SetText(not seen and "|cffaaaaaaTalk to your class trainer once to see every rank here, with its level and cost.|r" or "")
+		summary:SetText(not seen and "|cffaaaaaaOpen your class trainer to see the ranks here (in its Settings > Filters, tick Already Known and Unavailable once).|r" or "")
 	end
 end
 
