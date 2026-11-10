@@ -1,41 +1,96 @@
--- The "Train plan" button on the class trainer: trains what the plan wants and the gold allows. Hover: what it trains
--- and costs; right-click: choose a plan, or open the plan window. Opening the trainer also remembers its spell list
--- (Core.lua's ns.Record), for the plan window.
+-- The "Train plan" button on the class trainer: lists what the plan trains here and asks before training it. Hover:
+-- the same list; right-click: choose a plan, or open the plan window. Opening the trainer also remembers its spell
+-- list (Core.lua's ns.Record), for the plan window.
 local _, ns = ...
 ---@cast ns ObviTrainingNS
 
 local button ---@type Button?
 local buyingUntil = 0   -- buying goes on as new ranks open up (rank 2 is listed once rank 1 is learnt), until then
+local approved = {} ---@type table<string, boolean>   what the player said yes to: "name|rank"
 local recording = false
 
---- The services the plan trains that can be bought now, and what they cost together.
+---@class ObviTrainingBuy
+---@field name string
+---@field rank integer
+---@field rankText? string
+---@field cost integer
+
+--- What the plan trains here: the services it wants that can be learnt now, and the higher ranks of those spells it
+--- wants that open up once the lower rank is learnt (at your level already), in the trainer's order.
 ---@param plan ObviTrainingPlan
----@return integer[] services, integer cost
-local function ToBuy(plan)
-	local list, cost = {}, 0
-	for i = 1, GetNumTrainerServices() do
-		local name, rankText, category = GetTrainerServiceInfo(i)
-		if category == "available" and name and ns.Wants(plan, name, ns.RankOf(rankText), GetTrainerServiceLevelReq(i)) then
-			table.insert(list, i)
-			cost = cost + GetTrainerServiceCost(i)
+---@return ObviTrainingBuy[] list, integer cost
+local function Planned(plan)
+	local list, cost, buying = {}, 0, {}
+	local level = UnitLevel("player")
+	for pass = 1, 2 do
+		for i = 1, GetNumTrainerServices() do
+			local name, rankText, category = GetTrainerServiceInfo(i)
+			local rank = ns.RankOf(rankText)
+			local req = GetTrainerServiceLevelReq(i)
+			local now = category == "available"
+			-- pass 2: a higher rank of a spell bought in pass 1, at your level, waiting only for the rank below
+			local after = pass == 2 and category == "unavailable" and name and buying[name] and req <= level
+			if name and ((pass == 1 and now) or after) and ns.Wants(plan, name, rank, req) then
+				if pass == 1 then buying[name] = true end
+				table.insert(list, { name = name, rank = rank, rankText = rankText, cost = GetTrainerServiceCost(i) })
+				cost = cost + GetTrainerServiceCost(i)
+			end
 		end
 	end
+	table.sort(list, function(a, b) if a.name ~= b.name then return a.name < b.name end return a.rank < b.rank end)
 	return list, cost
 end
 
---- Buys what the plan wants and the gold allows (later services first, so their index stays right).
+local function Label(e) return e.name .. (e.rankText and e.rankText ~= "" and (" (" .. e.rankText .. ")") or "") end
+
+--- Buys the approved services that can be learnt now and the gold allows (later services first, so their index
+--- stays right). Called again as the trainer updates, for the ranks that open up.
 local function Buy()
-	local plan = ns.Current()
-	if not plan then return end
-	local list = ToBuy(plan)
 	local money = GetMoney()
-	for k = #list, 1, -1 do
-		local cost = GetTrainerServiceCost(list[k])
-		if cost <= money then
-			BuyTrainerService(list[k])
-			money = money - cost
+	for i = GetNumTrainerServices(), 1, -1 do
+		local name, rankText, category = GetTrainerServiceInfo(i)
+		local key = name and (name .. "|" .. ns.RankOf(rankText))
+		if category == "available" and key and approved[key] then
+			local cost = GetTrainerServiceCost(i)
+			if cost <= money then
+				approved[key] = nil
+				BuyTrainerService(i)
+				money = money - cost
+			end
 		end
 	end
+end
+
+-- the question: what will be trained, and the total
+local StaticPopupDialogs = _G["StaticPopupDialogs"] ---@type table
+local StaticPopup_Show = _G["StaticPopup_Show"] ---@type fun(which: string, a?: string, b?: string, data?: any): Frame?
+StaticPopupDialogs.OBVITRAINING_TRAIN = {
+	text = "%s",
+	button1 = "Train",
+	button2 = "Cancel",
+	OnAccept = function(_, data)
+		approved = {}
+		for _, e in ipairs(data) do approved[e.name .. "|" .. e.rank] = true end
+		buyingUntil = GetTime() + 5
+		Buy()
+	end,
+	hideOnEscape = 1,
+	timeout = 0,
+	whileDead = 1,
+}
+
+local function Confirm()
+	local plan = ns.Current()
+	if not plan then return end
+	local list, cost = Planned(plan)
+	if #list == 0 then return end
+	local lines = { ("%s: train these for %s?"):format(plan.title, ns.Coins(cost)), "" }
+	for _, e in ipairs(list) do table.insert(lines, ("%s  %s"):format(Label(e), ns.Coins(e.cost))) end
+	if cost > GetMoney() then
+		table.insert(lines, "")
+		table.insert(lines, "|cffff6060Not enough gold for all of it: only what you can afford is trained.|r")
+	end
+	StaticPopup_Show("OBVITRAINING_TRAIN", table.concat(lines, "\n"), nil, list)
 end
 
 local function ShowTooltip(self)
@@ -44,72 +99,17 @@ local function ShowTooltip(self)
 	if not plan then
 		GameTooltip:SetText("No training plan for your class")
 	else
-		local list, cost = ToBuy(plan)
+		local list, cost = Planned(plan)
 		GameTooltip:SetText(plan.title)
 		if #list == 0 then
 			GameTooltip:AddLine("Nothing to train from the plan here.", 1, 1, 1)
 		else
 			GameTooltip:AddLine(("Trains %d for %s:"):format(#list, ns.Coins(cost)), 1, 1, 1)
-			for _, i in ipairs(list) do
-				local name, rankText = GetTrainerServiceInfo(i)
-				GameTooltip:AddDoubleLine(name .. (rankText and rankText ~= "" and (" (" .. rankText .. ")") or ""),
-					ns.Coins(GetTrainerServiceCost(i)), 1, 0.82, 0, 1, 1, 1)
-			end
+			for _, e in ipairs(list) do GameTooltip:AddDoubleLine(Label(e), ns.Coins(e.cost), 1, 0.82, 0, 1, 1, 1) end
 		end
-		local skipped = 0
-		for i = 1, GetNumTrainerServices() do
-			local name, rankText, category = GetTrainerServiceInfo(i)
-			if category == "available" and name and not ns.Wants(plan, name, ns.RankOf(rankText), GetTrainerServiceLevelReq(i)) then
-				skipped = skipped + 1
-			end
-		end
-		if skipped > 0 then GameTooltip:AddLine(("Leaves %d not in the plan."):format(skipped), 0.6, 0.6, 0.6) end
 	end
 	GameTooltip:AddLine("Right-click: choose a plan, or edit it", 0.6, 0.6, 0.6)
 	GameTooltip:Show()
-end
-
--- The plan in the trainer's list: a green tick on the icon of each spell the plan trains, the rows it skips dimmed.
--- The rows are the trainer's own: a scrolling list whose rows know their service (elementData.skillIndex), or on an
--- older trainer, numbered row buttons whose id is the service.
-local ticks = setmetatable({}, { __mode = "k" }) ---@type table<Frame, Texture>
-
----@param row Frame
----@param index? integer   the trainer service the row shows
-local function Mark(row, index)
-	local plan = ns.Current()
-	local name, rankText, category
-	if index then name, rankText, category = GetTrainerServiceInfo(index) end
-	local marked = plan ~= nil and name ~= nil and not IsTradeskillTrainer()
-		and (category == "available" or category == "unavailable")
-	local wants = marked and ns.Wants(plan --[[@as ObviTrainingPlan]], name, ns.RankOf(rankText),
-		GetTrainerServiceLevelReq(index --[[@as integer]])) or false
-	local tick = ticks[row]
-	if wants and not tick then
-		tick = row:CreateTexture(nil, "OVERLAY", nil, 7)
-		tick:SetAtlas("common-icon-checkmark")
-		tick:SetSize(18, 18)
-		local icon = row["icon"] or row["Icon"]
-		if icon then tick:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 4, -4) else tick:SetPoint("LEFT", 4, 0) end
-		ticks[row] = tick
-	end
-	if tick then tick:SetShown(wants) end
-	row:SetAlpha((marked and not wants) and 0.45 or 1)
-end
-
-local function MarkAll()
-	local frame = _G["ClassTrainerFrame"]
-	if not frame then return end
-	local scrollBox = frame["ScrollBox"]
-	if scrollBox and scrollBox.ForEachFrame then
-		scrollBox:ForEachFrame(function(row, data) Mark(row, type(data) == "table" and data.skillIndex or nil) end)
-		return
-	end
-	for i = 1, 20 do
-		local row = _G["ClassTrainerSkill" .. i] ---@type Frame?
-		if not row then break end
-		if row:IsShown() then Mark(row, row:GetID()) end
-	end
 end
 
 local function Refresh()
@@ -117,9 +117,8 @@ local function Refresh()
 	-- class trainers only: a profession trainer uses the same window
 	local plan = ns.Current()
 	button:SetShown(not IsTradeskillTrainer())
-	button:SetEnabled(plan ~= nil and #(ToBuy(plan)) > 0)
+	button:SetEnabled(plan ~= nil and #(Planned(plan)) > 0)
 	if button:IsMouseOver() then ShowTooltip(button) end
-	MarkAll()
 end
 
 local function Menu(owner)
@@ -146,21 +145,11 @@ local function Setup()
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	button:SetScript("OnClick", function(self, which)
 		if which == "RightButton" then Menu(self) return end
-		buyingUntil = GetTime() + 5
-		Buy()
+		Confirm()
 	end)
 	button:SetScript("OnEnter", ShowTooltip)
 	button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	frame:HookScript("OnShow", Refresh)
-	-- rows drawn as the list scrolls, and the trainer's own redraw
-	local scrollBox = frame["ScrollBox"]
-	local ScrollUtil = _G["ScrollUtil"]
-	if scrollBox and ScrollUtil and ScrollUtil.AddAcquiredFrameCallback then
-		ScrollUtil.AddAcquiredFrameCallback(scrollBox, function(_, row, data)
-			Mark(row, type(data) == "table" and data.skillIndex or nil)
-		end, button)
-	end
-	if _G["ClassTrainerFrame_Update"] then hooksecurefunc("ClassTrainerFrame_Update", MarkAll) end
 	Refresh()
 end
 

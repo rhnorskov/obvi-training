@@ -3,8 +3,8 @@
 A leveling tool for WoW Forever. While leveling you don't want to train every rank of every spell: a lot of it is
 gold spent on spells you never cast (at max level you'd just train everything). Obvi Training puts a **Train plan**
 button on the class trainer, next to Train. It trains only what the training plan for your class says is worth it,
-and as new ranks open up (rank 2 after rank 1) it keeps going. Hover over it to see what it will train and what it
-costs; right-click it to pick another plan, or open the plan window.
+and as new ranks open up (rank 2 after rank 1) it keeps going. Clicking it first lists what it will train and what it
+costs, to say yes to; right-click it to pick another plan, or open the plan window.
 
 It works on its own; it goes well with [Obvi Guide](https://github.com/rhnorskov/obvi-guide), the guide viewer.
 
