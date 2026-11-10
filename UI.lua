@@ -405,6 +405,19 @@ ns.Refresh = function() previous() Fill() end
 SLASH_OBVITRAINING1 = "/otr"
 SLASH_OBVITRAINING2 = "/obvitraining"
 local slashCmdList = _G["SlashCmdList"] ---@type table<string, fun(msg: string)>
-slashCmdList.OBVITRAINING = function()
+slashCmdList.OBVITRAINING = function(msg)
+	if (msg or ""):lower():match("^%s*services") then
+		-- what the open trainer reports for each entry, and what the plan makes of it (to find out why it trains nothing)
+		local plan = ns.Current()
+		Print("plan: %s; level %d; %d entries", plan and plan.title or "none", UnitLevel("player"), GetNumTrainerServices())
+		for i = 1, GetNumTrainerServices() do
+			local name, rankText, category = GetTrainerServiceInfo(i)
+			local req = GetTrainerServiceLevelReq(i)
+			local wants = plan and name and ns.Wants(plan, name, ns.RankOf(rankText), req or 0)
+			Print("%d: %s | %s | %s | level %s | plan: %s", i, tostring(name), tostring(rankText), tostring(category),
+				tostring(req), wants and "train" or "skip")
+		end
+		return
+	end
 	if frame and frame:IsShown() then frame:Hide() else ns.OpenWindow() end
 end

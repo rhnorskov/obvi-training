@@ -26,7 +26,7 @@ local function Planned(plan)
 		for i = 1, GetNumTrainerServices() do
 			local name, rankText, category = GetTrainerServiceInfo(i)
 			local rank = ns.RankOf(rankText)
-			local req = GetTrainerServiceLevelReq(i)
+			local req = GetTrainerServiceLevelReq(i) or 0
 			local now = category == "available"
 			-- pass 2: a higher rank of a spell bought in pass 1, at your level, waiting only for the rank below
 			local after = pass == 2 and category == "unavailable" and name and buying[name] and req <= level
