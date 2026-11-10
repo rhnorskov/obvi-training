@@ -69,6 +69,49 @@ local function ShowTooltip(self)
 	GameTooltip:Show()
 end
 
+-- The plan in the trainer's list: a green tick on the icon of each spell the plan trains, the rows it skips dimmed.
+-- The rows are the trainer's own: a scrolling list whose rows know their service (elementData.skillIndex), or on an
+-- older trainer, numbered row buttons whose id is the service.
+local ticks = setmetatable({}, { __mode = "k" }) ---@type table<Frame, Texture>
+
+---@param row Frame
+---@param index? integer   the trainer service the row shows
+local function Mark(row, index)
+	local plan = ns.Current()
+	local name, rankText, category
+	if index then name, rankText, category = GetTrainerServiceInfo(index) end
+	local marked = plan ~= nil and name ~= nil and not IsTradeskillTrainer()
+		and (category == "available" or category == "unavailable")
+	local wants = marked and ns.Wants(plan --[[@as ObviTrainingPlan]], name, ns.RankOf(rankText),
+		GetTrainerServiceLevelReq(index --[[@as integer]])) or false
+	local tick = ticks[row]
+	if wants and not tick then
+		tick = row:CreateTexture(nil, "OVERLAY", nil, 7)
+		tick:SetAtlas("common-icon-checkmark")
+		tick:SetSize(18, 18)
+		local icon = row["icon"] or row["Icon"]
+		if icon then tick:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 4, -4) else tick:SetPoint("LEFT", 4, 0) end
+		ticks[row] = tick
+	end
+	if tick then tick:SetShown(wants) end
+	row:SetAlpha((marked and not wants) and 0.45 or 1)
+end
+
+local function MarkAll()
+	local frame = _G["ClassTrainerFrame"]
+	if not frame then return end
+	local scrollBox = frame["ScrollBox"]
+	if scrollBox and scrollBox.ForEachFrame then
+		scrollBox:ForEachFrame(function(row, data) Mark(row, type(data) == "table" and data.skillIndex or nil) end)
+		return
+	end
+	for i = 1, 20 do
+		local row = _G["ClassTrainerSkill" .. i] ---@type Frame?
+		if not row then break end
+		if row:IsShown() then Mark(row, row:GetID()) end
+	end
+end
+
 local function Refresh()
 	if not button then return end
 	-- class trainers only: a profession trainer uses the same window
@@ -76,6 +119,7 @@ local function Refresh()
 	button:SetShown(not IsTradeskillTrainer())
 	button:SetEnabled(plan ~= nil and #(ToBuy(plan)) > 0)
 	if button:IsMouseOver() then ShowTooltip(button) end
+	MarkAll()
 end
 
 local function Menu(owner)
@@ -108,6 +152,15 @@ local function Setup()
 	button:SetScript("OnEnter", ShowTooltip)
 	button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	frame:HookScript("OnShow", Refresh)
+	-- rows drawn as the list scrolls, and the trainer's own redraw
+	local scrollBox = frame["ScrollBox"]
+	local ScrollUtil = _G["ScrollUtil"]
+	if scrollBox and ScrollUtil and ScrollUtil.AddAcquiredFrameCallback then
+		ScrollUtil.AddAcquiredFrameCallback(scrollBox, function(_, row, data)
+			Mark(row, type(data) == "table" and data.skillIndex or nil)
+		end, button)
+	end
+	if _G["ClassTrainerFrame_Update"] then hooksecurefunc("ClassTrainerFrame_Update", MarkAll) end
 	Refresh()
 end
 
