@@ -24,8 +24,7 @@ local function Planned(plan)
 	local level = UnitLevel("player")
 	for pass = 1, 2 do
 		for i = 1, GetNumTrainerServices() do
-			local name, rankText, category = GetTrainerServiceInfo(i)
-			local rank = ns.RankOf(rankText)
+			local name, rank, category, rankText = ns.Service(i)
 			local req = GetTrainerServiceLevelReq(i) or 0
 			local now = category == "available"
 			-- pass 2: a higher rank of a spell bought in pass 1, at your level, waiting only for the rank below
@@ -48,8 +47,8 @@ local function Label(e) return e.name .. (e.rankText and e.rankText ~= "" and ("
 local function Buy()
 	local money = GetMoney()
 	for i = GetNumTrainerServices(), 1, -1 do
-		local name, rankText, category = GetTrainerServiceInfo(i)
-		local key = name and (name .. "|" .. ns.RankOf(rankText))
+		local name, rank, category = ns.Service(i)
+		local key = name and (name .. "|" .. rank)
 		if category == "available" and key and approved[key] then
 			local cost = GetTrainerServiceCost(i)
 			if cost <= money then

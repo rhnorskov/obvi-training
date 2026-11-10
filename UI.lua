@@ -411,10 +411,11 @@ slashCmdList.OBVITRAINING = function(msg)
 		local plan = ns.Current()
 		Print("plan: %s; level %d; %d entries", plan and plan.title or "none", UnitLevel("player"), GetNumTrainerServices())
 		for i = 1, GetNumTrainerServices() do
-			local name, rankText, category = GetTrainerServiceInfo(i)
+			local name, rank, category, rankText = ns.Service(i)
 			local req = GetTrainerServiceLevelReq(i)
-			local wants = plan and name and ns.Wants(plan, name, ns.RankOf(rankText), req or 0)
-			Print("%d: %s | %s | %s | level %s | plan: %s", i, tostring(name), tostring(rankText), tostring(category),
+			local wants = plan and name and ns.Wants(plan, name, rank, req or 0)
+			Print("%d: %s | %s | %s | level %s | plan: %s", i, tostring(name), rankText or ("rank " .. rank .. "?"),
+				tostring(category),
 				tostring(req), wants and "train" or "skip")
 		end
 		return

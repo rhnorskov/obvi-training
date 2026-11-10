@@ -24,6 +24,7 @@ local ns = addon
 ---@class ObviTrainingDB
 ---@field plans? ObviTrainingPlan[]   your plans, and your edits of built-in ones (same title and class)
 ---@field trainer? table<string, table<string, ObviTrainingSpell>>   class -> spell name -> what the trainer lists
+---@field version? integer   the saved data's layout
 
 ---@class ObviTrainingCharDB
 ---@field plan? string   the chosen plan's title (nil: the first plan for the class)
@@ -172,6 +173,43 @@ end
 ---@param text? string
 function ns.RankOf(text) return tonumber(text and text:match("(%d+)")) or 1 end
 
+local STATES = { available = true, unavailable = true, used = true, header = true }
+
+--- A trainer entry: name, rank, state ("available", "unavailable", "used", "header") and the rank as text ("Rank 4",
+--- nil without one). Clients differ: Classic gives name, rank text, state; Forever gives name, state, icon and no
+--- rank. So the state is whichever value is one, and the rank comes from rank text if there is any, else from the
+--- spell's own rank (its link), else from what it requires ("Seal of Righteousness (Rank 3)": this is rank 4).
+---@param i integer
+---@return string? name, integer rank, string? state, string? rankText
+function ns.Service(i)
+	local values = { GetTrainerServiceInfo(i) }
+	local name = values[1]
+	local state, text
+	for k = 2, 4 do
+		local v = values[k]
+		if type(v) == "string" then
+			if STATES[v] then state = state or v elseif v:find("%d") then text = text or v end
+		end
+	end
+	local rank = text and tonumber(text:match("(%d+)"))
+	if not rank then
+		local link = GetTrainerServiceItemLink(i)
+		local id = link and tonumber(link:match("spell:(%d+)"))
+		local sub = id and C_Spell.GetSpellSubtext(id)
+		rank = sub and tonumber(sub:match("(%d+)"))
+	end
+	if not rank and name then
+		local count = _G["GetTrainerServiceNumAbilityReq"] ---@type fun(i: integer): integer
+		for k = 1, count and count(i) or 0 do
+			local ability = GetTrainerServiceAbilityReq(i, k)
+			if ability and ability:find(name, 1, true) == 1 then
+				local below = tonumber(ability:match("%(Rank (%d+)%)"))
+				if below then rank = below + 1 end
+			end
+		end
+	end
+	return name, rank or 1, state, rank and ("Rank " .. rank) or nil
+end
 -- the text form: a header, then a line per spell. "#" starts a comment.
 --   Obvi Training plan
 --   title: Retribution Paladin
@@ -247,12 +285,12 @@ function ns.Record()
 		if not filters[f] then SetTrainerServiceTypeFilter(f, true, false) end
 	end
 	for i = 1, GetNumTrainerServices() do
-		local name, rankText, category = GetTrainerServiceInfo(i)
+		local name, rank, category = ns.Service(i)
 		if name and category ~= "header" then
 			local spell = spells[name] or { ranks = {} }
 			spells[name] = spell
 			spell.icon = GetTrainerServiceIcon(i) or spell.icon
-			spell.ranks[ns.RankOf(rankText)] = { level = GetTrainerServiceLevelReq(i) or 0, cost = GetTrainerServiceCost(i) or 0 }
+			spell.ranks[rank] = { level = GetTrainerServiceLevelReq(i) or 0, cost = GetTrainerServiceCost(i) or 0 }
 		end
 	end
 	for f, on in pairs(filters) do if not on then SetTrainerServiceTypeFilter(f, false, false) end end
@@ -267,5 +305,7 @@ events:SetScript("OnEvent", function(_, _, name)
 	ObviTrainingDB = ObviTrainingDB or {}
 	ObviTrainingCharDB = ObviTrainingCharDB or {}
 	ns.db, ns.charDB = ObviTrainingDB, ObviTrainingCharDB
+	-- the spell lists remembered before ranks were read right on Forever (every rank as rank 1): forgotten once
+	if (ns.db.version or 0) < 2 then ns.db.trainer, ns.db.version = nil, 2 end
 	events:UnregisterEvent("ADDON_LOADED")
 end)
